@@ -28,11 +28,10 @@ class Client(Cmd):
         接受消息线程
         """
         while self.__isLogin:
-            # noinspection PyBroadException
             try:
                 buffer = self.__socket.recv(1024).decode()
                 obj = json.loads(buffer)
-                print('[' + str(obj['sender_nickname']) + '(' + str(obj['sender_id']) + ')' + ']', obj['message'])
+                print('\n[' + str(obj['sender_nickname']) + '(' + str(obj['sender_id']) + ')' + '] ' + obj['message'] + '\n' + self.prompt, end = '')
             except Exception:
                 print('[Client] 无法从服务器获取数据')
 
@@ -77,13 +76,16 @@ class Client(Cmd):
         """
         nickname = args.split(' ')[0]
 
+        if self.__id != None:
+            print('[Client] 您已登录')
+            return
+
         # 将昵称发送给服务器，获取用户id
         self.__socket.send(json.dumps({
             'type': 'login',
             'nickname': nickname
         }).encode())
         # 尝试接受数据
-        # noinspection PyBroadException
         try:
             buffer = self.__socket.recv(1024).decode()
             obj = json.loads(buffer)
@@ -106,6 +108,11 @@ class Client(Cmd):
         发送消息
         :param args: 参数
         """
+
+        if self.__id == None:
+            print('[Client] 您还未登录')
+            return
+        
         message = args
         # 显示自己发送的消息
         print('[' + str(self.__nickname) + '(' + str(self.__id) + ')' + ']', message)
@@ -118,12 +125,33 @@ class Client(Cmd):
         登出
         :param args: 参数
         """
+        if self.__id == None:
+            print('[Client] 您还未登录')
+            return
+        
         self.__socket.send(json.dumps({
             'type': 'logout',
             'sender_id': self.__id
         }).encode())
         self.__isLogin = False
-        return True
+        self.__id = None
+        self.__nickname = None
+
+    def do_exit(self, args=None):
+        """
+        安全退出
+        :param args: 参数
+        """
+
+        if args==None:
+            self.__socket.send(json.dumps({
+                'type': 'logout',
+                'sender_id': self.__id
+            }).encode())
+            self.__isLogin = False
+            return True
+        else:
+            system ( 'exit ' + args )
 
     def do_help(self, arg):
         """
