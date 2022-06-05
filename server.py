@@ -33,7 +33,6 @@ class Server:
                 buffer = connection.recv(1024).decode()
                 # 解析成json数据
                 obj = json.loads(buffer)
-                # 如果是广播指令
                 if obj['type'] == 'broadcast':
                     self.__broadcast(obj['sender_id'], obj['message'])
                 elif obj['type'] == 'logout':
@@ -50,6 +49,21 @@ class Server:
                 self.__connections[user_id].close()
                 self.__connections[user_id] = None
                 self.__nicknames[user_id] = None
+
+    def __send2p(self, client_id, user_id=0, message=''):
+        """
+        单发
+        :param client_id: 接受消息的客户端id
+        :param user_id: 用户id(0为系统)
+        :param message: 广播内容
+        """
+        for i in range(1, len(self.__connections)):
+            if clien_id == i and self.__connections[i]:
+                self.__connections[i].send(json.dumps({
+                    'sender_id': user_id,
+                    'sender_nickname': self.__nicknames[user_id],
+                    'message': message
+                }).encode())
 
     def __broadcast(self, user_id=0, message=''):
         """
