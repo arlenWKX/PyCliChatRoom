@@ -35,16 +35,24 @@ class Client(Cmd):
             except Exception:
                 print('[Client] 无法从服务器获取数据')
 
-    def __send_message_thread(self, message):
+    def __send_message_thread(self, message, recv_id = None):
         """
         发送消息线程
         :param message: 消息内容
         """
-        self.__socket.send(json.dumps({
-            'type': 'broadcast',
-            'sender_id': self.__id,
-            'message': message
-        }).encode())
+        if recv_id == None:
+            self.__socket.send(json.dumps({
+                'type': 'broadcast',
+                'sender_id': self.__id,
+                'message': message
+            }).encode())
+        else:
+            self.__socket.send(json.dumps({
+                'type': 'p2p',
+                'sender_id': self.__id,
+                'message': message,
+                'recv_id': recv_id
+            }).encode())
 
     def start(self):
         """
@@ -65,7 +73,7 @@ class Client(Cmd):
         if len(args.split(' ')) > 1:
             port = args.split(' ')[1]
         try:
-            self.__socket.connect(('127.0.0.1', port))
+            self.__socket.connect((ip_addr, port))
         except socket.error as e:
             print(f'[Client] 无法连接到{ip_addr}:', e)
 

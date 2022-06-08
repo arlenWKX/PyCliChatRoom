@@ -58,7 +58,7 @@ class Server:
         :param message: 广播内容
         """
         for i in range(1, len(self.__connections)):
-            if clien_id == i and self.__connections[i]:
+            if client_id == i and self.__connections[i]:
                 self.__connections[i].send(json.dumps({
                     'sender_id': user_id,
                     'sender_nickname': self.__nicknames[user_id],
@@ -107,7 +107,7 @@ class Server:
         启动服务器
         """
         # 绑定端口
-        self.__socket.bind(('127.0.0.1', 8888))
+        self.__socket.bind(('0.0.0.0', 8888))
         # 启用监听
         self.__socket.listen(10)
         print('[Server] 服务器正在运行......')
