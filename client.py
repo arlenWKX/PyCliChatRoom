@@ -2,14 +2,19 @@ import socket
 import threading
 import json
 from cmd import Cmd
-from os import getcwd,system
+from os import getcwd, system
+from time import sleep
 
+ids = [ ]
+id_of = { }
+name_of = { }
 
 class Client(Cmd):
     """
     客户端
     """
     prompt = getcwd()+'>'
+    use_rawinput = False
     intro = '[Welcome] 简易聊天室客户端(Cli版)\n' + '[Welcome] 输入help来获取帮助\n' + '[Welcome] 本程序伪装为CMD，请不时cls一下\n'
 
     def __init__(self):
@@ -21,9 +26,8 @@ class Client(Cmd):
         self.__id = None
         self.__nickname = None
         self.__isLogin = False
-        self.use_rawinput = False
 
-    def __receive_message_thread(self):
+    def __receive_message_function(self):
         """
         接受消息线程
         """
@@ -31,9 +35,25 @@ class Client(Cmd):
             try:
                 buffer = self.__socket.recv(1024).decode()
                 obj = json.loads(buffer)
-                print('\n[' + str(obj['sender_nickname']) + '(' + str(obj['sender_id']) + ')' + '] ' + obj['message'] + '\n' + self.prompt, end = '')
-            except Exception:
-                print('[Client] 无法从服务器获取数据')
+                if obj['type'] == 0:
+                    print('\n[' + str(obj['sender_nickname']) + '(' + str(obj['sender_id']) + ')' + '] ' + obj['message'] + '\n' + self.prompt, end = '')
+                elif obj['type'] == 1:
+                    user_name = obj['message'].split(' ')[0]
+                    user_id = int(obj['message'].split(' ')[1])
+                    ids.append ( user_id )
+                    id_of [ user_name ] = user_id
+                    name_of [ user_id ] = user_name
+                    print('\n[System(0)] 用户' + user_name + '(' + str(user_id) + ') 加入了聊天室 ' + '\n' + self.prompt, end = '')
+                elif obj['type'] == 2:
+                    user_name = obj['message'].split(' ')[0]
+                    user_id = int(obj['message'].split(' ')[1])
+                    ids.remove ( user_id )
+                    id_of.pop ( user_name )
+                    name_of.pop ( user_id )
+                    print('\n[System(0)] 用户' + user_name + '(' + str(user_id) + ') 退出了聊天室 ' + '\n' + self.prompt, end = '' )
+                
+            except Exception as e:
+                print('[Client] 无法从服务器获取数据', e)
 
     def __send_message_thread(self, message, recv_id = None):
         """
@@ -58,35 +78,48 @@ class Client(Cmd):
         """
         启动客户端
         """
-        try:
-            self.__socket.connect(('127.0.0.1', 8888))
-        except socket.error as e:
-            print('[Client] 无法连接到本地服务器:', e)
+        self.__ip_addr = '127.0.0.1'
+        self.__port = 8888
         self.cmdloop()
 
     def default(self, args):
         system(args)
 
-    def do_connect(self, args):
-        ip_addr = args.split(' ')[0]
-        port = 8888
-        if len(args.split(' ')) > 1:
-            port = args.split(' ')[1]
+    def connect_to_server ( self ):
         try:
-            self.__socket.connect((ip_addr, port))
-        except socket.error as e:
-            print(f'[Client] 无法连接到{ip_addr}:', e)
+            self.__socket.connect( ( self.__ip_addr, self.__port) )
+        except Exception as e:
+            print(f'[Client] 无法连接到{self.__ip_addr}:{self.__port}:', e)
+            return False;
+        
+        return True
 
+    def do_connect(self, args):
+        self.__ip_addr = args.split(' ')[0]
+        self.__port = 8888
+        if len(args.split(' ')) > 1:
+            self.__port = args.split(' ')[1]
+        self.connect_to_server()
+        
     def do_login(self, args):
         """
         登录聊天室
         :param args: 参数
         """
-        nickname = args.split(' ')[0]
 
         if self.__id != None:
             print('[Client] 您已登录')
             return
+
+        print('[Client] 连接到服务器……')
+
+        res = self.connect_to_server()
+        if res != True:
+            return
+
+        nickname = args.split(' ')[0]
+
+        print('[Client] 登录中……')
 
         # 将昵称发送给服务器，获取用户id
         self.__socket.send(json.dumps({
@@ -104,19 +137,18 @@ class Client(Cmd):
                 print('[Client] 成功登录到聊天室')
 
                 # 开启子线程用于接受数据
-                thread = threading.Thread(target=self.__receive_message_thread,daemon=True)
-                thread.start()
+                self.__receive_message_thread = threading.Thread(target=self.__receive_message_function,daemon=True)
+                self.__receive_message_thread.start()
             else:
                 print('[Client] 无法登录到聊天室')
-        except Exception:
-            print('[Client] 无法从服务器获取数据')
+        except Exception as e:
+            print('[Client] 无法从服务器获取数据', e)
 
     def do_send(self, args):
         """
         发送消息
         :param args: 参数
         """
-
         if self.__id == None:
             print('[Client] 您还未登录')
             return
@@ -128,6 +160,38 @@ class Client(Cmd):
         thread = threading.Thread(target=self.__send_message_thread, args=(message,),daemon=True)
         thread.start()
 
+    # def do_sendto(self, args):
+    #     """
+    #     单发消息
+    #     :param args: 参数
+    #     """
+    #     if self.__id == None:
+    #         print('[Client] 您还未登录')
+    #         return
+
+    #     recv_id = 0
+    #     recv_name = ''
+        
+    #     if args.split(' ')[0] == 'id':
+    #         recv_id = int(args.split(' ')[1])
+    #         print('recvid', recv_id )
+    #         if recv_id not in ids:
+    #             print('[Client] 未找到用户')
+    #             return
+    #         recv_name = name_of [ recv_id ]
+    #     elif args.split(' ')[0] == 'name':
+    #         if not args.split(' ')[1] in id_of:
+    #             print('[Client] 未找到用户')
+    #             return
+    #         recv_id = id_of[args.split(' ')[2]]
+    #         recv_name = args.split(' ')[1]
+        
+    #     # 显示自己发送的消息
+    #     print('[' + str(self.__nickname) + '(' + str(self.__id) + ')' + '] 对 ' + recv_name + '(' + str(recv_id) + ') 悄悄说' + message)
+    #     # 开启子线程用于发送数据
+    #     thread = threading.Thread(target=self.__send_message_thread, args=(message, recv_id),daemon=True)
+    #     thread.start()
+
     def do_logout(self, args=None):
         """
         登出
@@ -136,14 +200,20 @@ class Client(Cmd):
         if self.__id == None:
             print('[Client] 您还未登录')
             return
+
+        print('[Client] 登出中……' )
         
         self.__socket.send(json.dumps({
             'type': 'logout',
             'sender_id': self.__id
         }).encode())
         self.__isLogin = False
+        self.__receive_message_thread.join()
+        self.__socket.close()
         self.__id = None
         self.__nickname = None
+
+        print('[Client] 已登出' )
 
     def do_exit(self, args=None):
         """
@@ -151,12 +221,8 @@ class Client(Cmd):
         :param args: 参数
         """
 
-        if args==None:
-            self.__socket.send(json.dumps({
-                'type': 'logout',
-                'sender_id': self.__id
-            }).encode())
-            self.__isLogin = False
+        if args==None or args!=None and args != '/?':
+            self.do_logout(self)
             return True
         else:
             system ( 'exit ' + args )
