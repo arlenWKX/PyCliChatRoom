@@ -24,7 +24,7 @@ class Server:
         connection = self.__connections[user_id]
         nickname = self.__nicknames[user_id]
         print('[Server] 用户', user_id, nickname, '加入聊天室')
-        self.__broadcast(user_id=0, message=str(nickname)+' '+str(user_id), type=1)
+        self.__broadcast(user_id=0, message=str(nickname)+' '+str(user_id), type=1, except_id = user_id)
 
         # 侦听
         while True:
@@ -37,7 +37,7 @@ class Server:
                     self.__broadcast(user_id=obj['sender_id'], type=0, message=obj['message'])
                 elif obj['type'] == 'logout':
                     print('[Server] 用户', user_id, nickname, '退出聊天室')
-                    self.__broadcast(user_id=0, message=str(nickname)+' '+str(user_id), type=2)
+                    self.__broadcast(user_id=0, message=str(nickname)+' '+str(user_id), type=2, except_id = user_id)
                     self.__connections[user_id] = None
                     break
                 elif obj['type'] == 'exit':
@@ -65,14 +65,14 @@ class Server:
     #                 'message': message
     #             }).encode())
 
-    def __broadcast(self, user_id=0, type=0, message=''):
+    def __broadcast(self, user_id=0, type=0, message='', except_id = None):
         """
         广播
         :param user_id: 用户id(0为系统)
         :param message: 广播内容
         """
         for i in range(1, len(self.__connections)):
-            if user_id != i and self.__connections[i]:
+            if user_id != i and user_id != except_id and self.__connections[i]:
                 self.__connections[i].send(json.dumps({
                     'type': type,
                     'sender_id': user_id,
