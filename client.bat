@@ -1,2 +1,1 @@
-@client.py
-@pause
+@start python.exe client.py

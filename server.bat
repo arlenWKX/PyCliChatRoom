@@ -1,2 +1,1 @@
-@server.py
-@pause
+@start python.exe server.py
