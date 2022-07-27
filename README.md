@@ -1,2 +1,2 @@
 # PyCliChatRoom
-A command-line-based web chat room, written in Python and masquerading as CMD
+A command-line-based web chat room, written in Python and camouflaged as CMD
