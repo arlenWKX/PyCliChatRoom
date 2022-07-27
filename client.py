@@ -1,3 +1,4 @@
+from ast import Constant
 import socket
 import threading
 import json
@@ -9,6 +10,7 @@ ids = []
 id_of = {}
 name_of = {}
 
+version='RC2'
 
 class Client(Cmd):
     """
@@ -19,6 +21,7 @@ class Client(Cmd):
     intro = '[Welcome] 简易聊天室客户端(Cli版)\n' + '[Welcome] 输入help来获取帮助\n' + \
         '[Welcome] 本程序伪装为CMD，请不时cls一下\n'
 
+
     def __init__(self):
         """
         构造
@@ -28,6 +31,7 @@ class Client(Cmd):
         self.__id = None
         self.__nickname = None
         self.__isLogin = False
+
 
     def __receive_message_function(self):
         """
@@ -60,6 +64,7 @@ class Client(Cmd):
             except Exception as e:
                 print('[Client] 无法从服务器获取数据', e)
 
+
     def __send_message_thread(self, message, recv_id=None):
         """
         发送消息线程
@@ -83,12 +88,13 @@ class Client(Cmd):
         """
         启动客户端
         """
-        self.__ip_addr = '127.0.0.1'
-        self.__port = 8888
+        self.__ip_addr = self.__port = None
         self.cmdloop()
+
 
     def default(self, args):
         system(args)
+
 
     def connect_to_server(self):
         try:
@@ -96,18 +102,54 @@ class Client(Cmd):
         except Exception as e:
             print(f'[Client] 无法连接到{self.__ip_addr}:{self.__port}:', e)
             return False
-
         return True
+
 
     def do_switchserver(self, args):
         """
         切换聊天室
         :param args: 参数
         """
-        self.__ip_addr = args.split(' ')[0]
-        self.__port = 8888
-        if len(args.split(' ')) > 1:
-            self.__port = args.split(' ')[1]
+        if args == 'local':
+            self.__ip_addr = '127.0.0.1'
+            self.__port = 8888
+        else:
+            self.__ip_addr = args.split(' ')[0]
+            self.__port = 8888
+            if len(args.split(' ')) > 1:
+                self.__port = args.split(' ')[1]
+        print(f'[Client] 切换服务器到{self.__ip_addr}:{self.__port}')
+        print('[Client] 测试连接中……')
+        res = self.connect_to_server()
+        if res == False:
+            print('[Client] 无法连接至服务器')
+            self.__ip_addr = None
+            return False
+        print('[Client] 测试数据传输与版本中中……')
+        self.__socket.send(json.dumps({
+            'type': 'test_connect',
+            'version': version,
+            'message': 'azAZ09+-*/_'
+        }).encode())
+        try:
+            buffer = self.__socket.recv(1024).decode()
+            obj = json.loads(buffer)
+        except Exception as e:
+            print('[Client] 你在玩？')
+            self.__ip_addr = None
+            return False
+        if obj['message'] == 'ok':
+            print('[Client] OK')
+            return
+        elif obj['version'] != version:
+            print('[Client] 服务器版本不匹配')
+            self.__ip_addr = None
+            return False
+        else:
+            print('[Client] 网络不稳定')
+            self.__ip_addr = None
+            return False
+
 
     def do_login(self, args):
         """
@@ -116,6 +158,9 @@ class Client(Cmd):
         """
         if self.__id != None:
             print('[Client] 您已登录')
+            return
+        if self.__ip_addr == None:
+            print('[Client] 请先选择服务器')
             return
         print('[Client] 连接到服务器……')
         res = self.connect_to_server()
@@ -146,6 +191,7 @@ class Client(Cmd):
         except Exception as e:
             print('[Client] 无法从服务器获取数据', e)
 
+
     def do_send(self, args):
         """
         发送消息
@@ -162,6 +208,7 @@ class Client(Cmd):
         thread = threading.Thread(
             target=self.__send_message_thread, args=(message,), daemon=True)
         thread.start()
+
 
     # def do_sendto(self, args):
     #     """
@@ -195,6 +242,7 @@ class Client(Cmd):
     #     thread = threading.Thread(target=self.__send_message_thread, args=(message, recv_id),daemon=True)
     #     thread.start()
 
+
     def do_logout(self, args=None):
         """
         登出
@@ -215,6 +263,7 @@ class Client(Cmd):
         self.__nickname = None
         print('[Client] 已登出')
 
+
     def do_exit(self, args=None):
         """
         安全退出
@@ -225,6 +274,7 @@ class Client(Cmd):
             return True
         else:
             system('exit ' + args)
+
 
     def do_help(self, arg):
         """

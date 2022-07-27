@@ -3,6 +3,8 @@ import threading
 import json
 
 
+version='RC2'
+
 class Server:
     """
     服务器类
@@ -106,6 +108,18 @@ class Server:
                 # 开辟一个新的线程
                 thread = threading.Thread(target=self.__user_thread, args=(id,),daemon=True)
                 thread.start()
+            elif obj['type'] == 'test_connect':
+                if obj['version'] == version and obj['message'] == 'azAZ09+-*/_':
+                    connection.send(json.dumps({
+                        'type': 'test_connect',
+                        'message': 'ok'
+                    }).encode())
+                else:
+                    connection.send(json.dumps({
+                        'type': 'test_connect',
+                        'version': version,
+                        'message': 'failed'
+                    }).encode())
             else:
                 print('[Server] 无法解析json数据包:', connection.getsockname(), connection.fileno())
         except Exception as e:
