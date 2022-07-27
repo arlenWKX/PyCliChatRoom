@@ -10,7 +10,7 @@ ids = []
 id_of = {}
 name_of = {}
 
-version='RC2'
+version='RC4'
 
 class Client(Cmd):
     """
