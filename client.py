@@ -1,10 +1,8 @@
-from ast import Constant
 import socket
 import threading
 import json
 from cmd import Cmd
 from os import getcwd, system
-from time import sleep
 
 ids = []
 id_of = {}
@@ -18,8 +16,7 @@ class Client(Cmd):
     """
     prompt = getcwd()+'>'
     use_rawinput = False
-    intro = '[Welcome] 简易聊天室客户端(Cli版)\n' + '[Welcome] 输入help来获取帮助\n' + \
-        '[Welcome] 本程序伪装为CMD，请不时cls一下\n'
+    intro = '[Welcome] 欢迎来到Python命令行聊天室客户端\n' + '[Welcome] 输入help all来获取帮助\n'
 
 
     def __init__(self):
