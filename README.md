@@ -6,7 +6,7 @@
 
 # 特性
 * 纯命令行实现
-* 仅依赖基本库 socket 、 threading 、 json 、 cmd 、 os ，开箱即用
+* 仅依赖基本库 `socket` 、 `threading` 、 `json` 、 `cmd` 、 `os` ，开箱即用
 * 伪装为命令提示符
 * ……
 
@@ -16,11 +16,11 @@
 
 # 运行方法
 进入项目根目录，执行命令：
-```
+```shell
 python3 ./server.py
 ```
 来启动服务端，执行命令：
-```
+```shell
 python3 ./clien.py
 ```
 来启动客户端
