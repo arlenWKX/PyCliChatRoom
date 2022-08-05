@@ -430,6 +430,7 @@ class Client(Cmd):
 
         elif command == 'server':
             print('[Help] server host (port) - 切换到服务器，host是服务器的IP地址或主机名，port是端口')
+            print('[Help] server search (port) - 在局域网上寻找服务器，port是端口')
         elif command == 'logout':
             print('[Help] logout - 退出聊天室')
         else:
