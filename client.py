@@ -1,8 +1,11 @@
 import socket
 import threading
 import json
+import os
 from cmd import Cmd
-from os import getcwd, system
+import sys
+import re
+from time import sleep
 
 ids = []
 id_of = {}
@@ -10,11 +13,55 @@ name_of = {}
 
 version='RC4'
 
+class DummyFile(object):
+    def write(self, x): pass
+    def flush(self): pass
+
+class ProgressBar(object):
+    DEFAULT = 'Progress: %(bar)s %(percent)3d%% '
+    FULL = '%(bar)s %(current)d/%(total)d (%(percent)3d%%) %(remaining)d to go'
+
+    def __init__(self, total, width=40, fmt=DEFAULT, symbol='=',
+                 output=sys.stderr):
+        assert len(symbol) == 1
+
+        self.total = total
+        self.width = width
+        self.symbol = symbol
+        self.output = output
+        self.fmt = re.sub(r'(?P<name>%\(.+?\))d',
+            r'\g<name>%dd' % len(str(total)), fmt)
+
+        self.current = 0
+
+    def __call__(self):
+        percent = self.current / float(self.total)
+        size = int(self.width * percent)
+        remaining = self.total - self.current
+        if self.current!=self.total:
+            bar = '[' + self.symbol * size + '>' + ' ' * (self.width - size) + ']'
+        else:
+            bar = '[' + self.symbol * size + ']'
+
+        args = {
+            'total': self.total,
+            'bar': bar,
+            'current': self.current,
+            'percent': percent * 100,
+            'remaining': remaining
+        }
+        print('\r' + self.fmt % args, file=self.output, end='')
+
+    def done(self):
+        self.current = self.total
+        self()
+        print('', file=self.output)
+
 class Client(Cmd):
     """
     客户端
     """
-    prompt = getcwd()+'>'
+    prompt = os.getcwd()+'>'
     use_rawinput = False
     intro = '[Welcome] 欢迎来到Python命令行聊天室客户端\n' + '[Welcome] 输入help all来获取帮助\n'
 
@@ -59,6 +106,7 @@ class Client(Cmd):
 
             except Exception as e:
                 print('[Client] 无法从服务器获取数据', e)
+                break
 
 
     def __send_message_thread(self, message, recv_id=None):
@@ -89,8 +137,14 @@ class Client(Cmd):
 
 
     def default(self, args):
-        system(args)
+        os.system(args)
 
+    def do_userlist(self, args):
+        if self.__isLogin:
+            for id in ids:
+                print(name_of[id]+' '+str(id))
+        else:
+            print ( '[Client] 您还未登陆' )
 
     def connect_to_server(self):
         self.__socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -101,57 +155,123 @@ class Client(Cmd):
             return False
         return True
 
-
-    def do_switchserver(self, args):
-        """
-        切换聊天室
-        :param args: 参数
-        """
-        self.__socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        if args == 'local':
-            self.__ip_addr = '127.0.0.1'
-            self.__port = 8888
-        else:
-            self.__ip_addr = args.split(' ')[0]
-            self.__port = 8888
-            if len(args.split(' ')) > 1:
-                self.__port = args.split(' ')[1]
-        print(f'[Client] 切换服务器到{self.__ip_addr}:{self.__port}')
+    def testserver(self, ip, port):
+        tsocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        tsocket.settimeout(1)
+        if ip == 'local':
+            ip = '127.0.0.1'
+        print(f'[Client] 测试服务器{ip}:{port}')
         print('[Client] 测试连接中……')
-        res = self.connect_to_server()
-        if res == False:
-            print('[Client] 无法连接至服务器')
-            self.__ip_addr = None
-            self.__socket.close()
+        try:
+            tsocket.connect((ip, port))
+        except Exception as e:
+            print(f'[Client] 无法连接至服务器:', e)
+            tsocket.close()
             return False
+        
         print('[Client] 测试数据传输与版本中中……')
-        self.__socket.send(json.dumps({
+        tsocket.send(json.dumps({
             'type': 'test_connect',
             'version': version,
             'message': 'azAZ09+-*/_'
         }).encode())
         try:
-            buffer = self.__socket.recv(1024).decode()
+            buffer = tsocket.recv(1024).decode()
             obj = json.loads(buffer)
         except Exception as e:
             print('[Client] 服务器错误')
-            self.__ip_addr = None
-            self.__socket.close()
+            tsocket.close()
             return False
         if obj['message'] == 'ok':
             print('[Client] OK')
-            self.__socket.close()
-            return
+            tsocket.close()
+            return True
         elif obj['version'] != version:
             print('[Client] 服务器版本不匹配')
-            self.__ip_addr = None
-            self.__socket.close()
+            tsocket.close()
             return False
         else:
             print('[Client] 网络不稳定')
-            self.__ip_addr = None
-            self.__socket.close()
+            tsocket.close()
             return False
+
+    def scan_func(self,ip,port,save_stdout,lst):
+        if self.testserver(ip, port):
+            lst.append(ip)
+        return
+
+    def do_server(self, args):
+        """
+        切换聊天室
+        :param args: 参数
+        """
+        args=args.split(' ')
+
+        if args[0]=="search":
+            port = 8888
+            if len(args) > 1:
+                port=int(args[1])
+            print(f'[Client] 在局域网中扫描端口为{port}的服务器……')
+
+            ip_prefix=socket.gethostbyname(socket.gethostname())
+            for i in range(len(ip_prefix)-1,-1,-1):
+                if ip_prefix[i] == '.':
+                    ip_prefix=ip_prefix[0:i+1]
+                    break
+            ips = ['local']
+            with os.popen("arp.exe -a") as res:
+                for line in res:
+                    line = line.strip()
+                    if line and line.startswith(ip_prefix):
+                        ips.append(line.split()[0])
+
+            progress = ProgressBar(len(ips)*2+8, 30, fmt=ProgressBar.DEFAULT)
+            servs = []
+            scan_thread=[]
+            save_stdout = sys.stdout
+            sys.stdout = DummyFile()
+            for ip in ips:
+                scan_thread.append( threading.Thread(target=self.scan_func, args=(ip,port,save_stdout,servs)))
+                progress.current += 1
+                progress()
+                sleep(0.01)
+            for i in range(0,8):
+                scan_thread[i].start()
+                progress.current += 1
+                progress()
+                sleep(0.01)
+            for i in range(0,len(scan_thread)-8):
+                progress.current += 1
+                progress()
+                scan_thread[i].join()
+                scan_thread[i+8].start()
+                sleep(0.01)
+            for i in range(len(scan_thread)-8,len(scan_thread)):
+                scan_thread[i].join()
+                progress.current += 1
+                progress()
+                sleep(0.01)
+            sys.stdout = save_stdout
+            print('')
+            if len(servs) > 0:
+                for i in servs:
+                    print(f"[Client] 发现服务器：{i}:{port}")
+            else:
+                print('[Client] 未发现服务器')
+            return
+
+        self.__socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        if args[0] == 'local':
+            self.__ip_addr = '127.0.0.1'
+            self.__port = 8888
+        else:
+            self.__ip_addr = args[0]
+            self.__port = 8888
+            if len(args) > 1:
+                self.__port = args[1]
+        print(f'[Client] 切换服务器到{self.__ip_addr}:{self.__port}')
+        if not self.testserver(self.__ip_addr, self.__port):
+            self.__ip_addr = self.__port = None
 
 
     def do_login(self, args):
@@ -184,6 +304,14 @@ class Client(Cmd):
                 self.__nickname = nickname
                 self.__id = obj['id']
                 self.__isLogin = True
+                lst=obj['userlist'].split('\n')
+                #print(lst)
+                for i in range(0,len(lst)):
+                    #print(i)
+                    if lst[i] != '' and i != self.__id:
+                        ids.append(i)
+                        id_of[lst[i]] = i
+                        name_of[i] = lst[i]
                 print('[Client] 成功登录到聊天室')
                 # 开启子线程用于接受数据
                 self.__receive_message_thread = threading.Thread(
@@ -264,6 +392,9 @@ class Client(Cmd):
         self.__socket.close()
         self.__id = None
         self.__nickname = None
+        ids.clear()
+        id_of.clear()
+        name_of.clear()
         print('[Client] 已登出')
 
 
@@ -276,7 +407,7 @@ class Client(Cmd):
             self.do_logout(self)
             return True
         else:
-            system('exit ' + args)
+            os.system('exit ' + args)
 
 
     def do_help(self, arg):
@@ -289,18 +420,20 @@ class Client(Cmd):
             print('[Help] connect ipaddress (port) - 连接到服务器，ipaddress是服务器的IP地址，port是端口')
             print('[Help] login nickname - 登录到聊天室，nickname是你选择的昵称')
             print('[Help] send message - 发送消息，message是你输入的消息')
+            print('[Help] server host (port) - 切换到服务器，host是服务器的IP地址或主机名，port是端口')
             print('[Help] logout - 退出聊天室')
+
         elif command == 'login':
             print('[Help] login nickname - 登录到聊天室，nickname是你选择的昵称')
         elif command == 'send':
             print('[Help] send message - 发送消息，message是你输入的消息')
+
+        elif command == 'server':
+            print('[Help] server host (port) - 切换到服务器，host是服务器的IP地址或主机名，port是端口')
         elif command == 'logout':
             print('[Help] logout - 退出聊天室')
-        elif command == 'switchserver':
-            print(
-                '[Help] switchserver ipaddress (port) - 切换到服务器，ipaddress是服务器的IP地址，port是端口')
         else:
-            system('help ' + arg)
+            os.system('help ' + arg)
 
 
 client = Client()

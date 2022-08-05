@@ -101,8 +101,16 @@ class Server:
                     self.__nicknames.append(obj['nickname'])
                     self.__connections.append(connection)
                     print ( "[Server] 新增用户 " + obj['nickname'] + '(' + str ( id ) + ')' )
+
+                lst=""
+                print(self.__nicknames)
+                for i in range(0,len(self.__nicknames)):
+                    lst = lst + self.__nicknames[i] + '\n'
+                print(lst)
+
                 connection.send(json.dumps({
-                    'id': id
+                    'id': id,
+                    'userlist': lst
                 }).encode())
 
                 # 开辟一个新的线程
