@@ -1,1 +1,1 @@
-@start cmd /k python.exe %~dp0client.py && pause
+@start python.exe %~dp0client.py

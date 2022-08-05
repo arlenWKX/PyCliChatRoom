@@ -120,6 +120,7 @@ class Server:
                         'version': version,
                         'message': 'failed'
                     }).encode())
+                connection.close()
             else:
                 print('[Server] 无法解析json数据包:', connection.getsockname(), connection.fileno())
         except Exception as e:
@@ -130,10 +131,18 @@ class Server:
         启动服务器
         """
         # 绑定端口
-        self.__socket.bind(('0.0.0.0', 8888))
-        # 启用监听
-        self.__socket.listen(10)
-        print('[Server] 服务器正在运行......')
+        port=8888
+        while port>0:
+            try:
+                self.__socket.bind(('0.0.0.0', port))
+                # 启用监听
+                self.__socket.listen(10)
+            except Exception as e:
+                print(f'[Server] 端口{port}已被占用！尝试其它端口……')
+                port = port - 1
+            else:
+                break
+        print(f'[Server] 服务器正在端口{port}上运行......')
 
         # 清空连接
         self.__connections.clear()

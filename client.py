@@ -24,7 +24,6 @@ class Client(Cmd):
         构造
         """
         super().__init__()
-        self.__socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.__id = None
         self.__nickname = None
         self.__isLogin = False
@@ -94,6 +93,7 @@ class Client(Cmd):
 
 
     def connect_to_server(self):
+        self.__socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
             self.__socket.connect((self.__ip_addr, self.__port))
         except Exception as e:
@@ -107,6 +107,7 @@ class Client(Cmd):
         切换聊天室
         :param args: 参数
         """
+        self.__socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         if args == 'local':
             self.__ip_addr = '127.0.0.1'
             self.__port = 8888
@@ -121,6 +122,7 @@ class Client(Cmd):
         if res == False:
             print('[Client] 无法连接至服务器')
             self.__ip_addr = None
+            self.__socket.close()
             return False
         print('[Client] 测试数据传输与版本中中……')
         self.__socket.send(json.dumps({
@@ -132,19 +134,23 @@ class Client(Cmd):
             buffer = self.__socket.recv(1024).decode()
             obj = json.loads(buffer)
         except Exception as e:
-            print('[Client] 你在玩？')
+            print('[Client] 服务器错误')
             self.__ip_addr = None
+            self.__socket.close()
             return False
         if obj['message'] == 'ok':
             print('[Client] OK')
+            self.__socket.close()
             return
         elif obj['version'] != version:
             print('[Client] 服务器版本不匹配')
             self.__ip_addr = None
+            self.__socket.close()
             return False
         else:
             print('[Client] 网络不稳定')
             self.__ip_addr = None
+            self.__socket.close()
             return False
 
 
