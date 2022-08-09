@@ -272,6 +272,7 @@ class Client(Cmd):
             else:
                 for i in scan_thread:
                     i.start()
+                    i.join()
                     progress.current += 1
                     progress()
                     sleep(0.01)            
