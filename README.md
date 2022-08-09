@@ -13,6 +13,7 @@
 
 # 运行需求
 * Python 3+
+* `server search` 和命令行集成功能需要 `windows`
 * 没有了
 
 # 运行方法

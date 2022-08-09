@@ -139,6 +139,9 @@ class Client(Cmd):
         os.system(args)
 
     def do_userlist(self, args):
+        """
+        输出在线用户列表
+        """
         if self.__isLogin:
             for id in ids:
                 print(name_of[id]+' '+str(id))
@@ -146,6 +149,9 @@ class Client(Cmd):
             print ( '[Client] 您还未登陆' )
 
     def connect_to_server(self):
+        """
+        连接到服务器
+        """
         self.__socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
             self.__socket.connect((self.__ip_addr, self.__port))
@@ -155,6 +161,11 @@ class Client(Cmd):
         return True
 
     def testserver(self, ip, port):
+        """
+        测试服务器
+        :param ip: 服务器IP
+        :param port: 服务器端口
+        """
         tsocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         tsocket.settimeout(1)
         if ip == 'local':
@@ -195,13 +206,19 @@ class Client(Cmd):
             return False
 
     def scan_func(self,ip,port,lst):
+        """
+        扫描服务器线程
+        :param ip: 服务器IP
+        :param port: 服务器端口
+        :param lst: 返回结果的列表
+        """
         if self.testserver(ip, port):
             lst.append(ip)
         return
 
     def do_server(self, args):
         """
-        切换聊天室
+        切换服务器或在局域网内扫描
         :param args: 参数
         """
         args=args.split(' ')
@@ -230,26 +247,33 @@ class Client(Cmd):
             save_stdout = sys.stdout
             sys.stdout = DummyFile()
             for ip in ips:
-                scan_thread.append( threading.Thread(target=self.scan_func, args=(ip,port,save_stdout,servs)))
+                scan_thread.append( threading.Thread(target=self.scan_func, args=(ip,port,servs)))
                 progress.current += 1
                 progress()
                 sleep(0.01)
-            for i in range(0,8):
-                scan_thread[i].start()
-                progress.current += 1
-                progress()
-                sleep(0.01)
-            for i in range(0,len(scan_thread)-8):
-                progress.current += 1
-                progress()
-                scan_thread[i].join()
-                scan_thread[i+8].start()
-                sleep(0.01)
-            for i in range(len(scan_thread)-8,len(scan_thread)):
-                scan_thread[i].join()
-                progress.current += 1
-                progress()
-                sleep(0.01)
+            if len ( ips ) >= 8:
+                for i in range(0,8):
+                    scan_thread[i].start()
+                    progress.current += 1
+                    progress()
+                    sleep(0.01)
+                for i in range(0,len(scan_thread)-8):
+                    progress.current += 1
+                    progress()
+                    scan_thread[i].join()
+                    scan_thread[i+8].start()
+                    sleep(0.01)
+                for i in range(len(scan_thread)-8,len(scan_thread)):
+                    scan_thread[i].join()
+                    progress.current += 1
+                    progress()
+                    sleep(0.01)
+            else:
+                for i in scan_thread:
+                    i.start()
+                    progress.current += 1
+                    progress()
+                    sleep(0.01)            
             sys.stdout = save_stdout
             print('')
             if len(servs) > 0:
@@ -289,7 +313,9 @@ class Client(Cmd):
         if res != True:
             return
         nickname = args.split(' ')[0]
-        print('[Client] 登录中……')
+        if ( nickname.isdigit ( ) ):
+            print('[Client] 用户名不能为数字')
+            return
         # 将昵称发送给服务器，获取用户id
         self.__socket.send(json.dumps({
             'type': 'login',
@@ -412,29 +438,31 @@ class Client(Cmd):
         else:
             os.system('exit ' + args)
 
-
     def do_help(self, arg):
         """
         帮助
         :param arg: 参数
         """
+
+        help_str = {
+            'help'    : 'help    <command> | all 查看该命令的帮助或查看所有帮助',
+            'server'  : 'server  <host> [<port>] 切换到服务器，会自动测试网络\n'+
+                        '        search [<port>] 搜索局域网上所有服务器（默认端口：8888）',
+            'login'   : 'login   <nickname>      登录到服务器',
+            'send'    : 'send    <message>       群发消息',
+            'sendto'  : 'sendto  <users> <msg>   向users发送消息，可以是用户id或用户名，用逗号分隔',
+            'userlist': 'userlist                输出所有在线用户',
+            'logout'  : 'logout                  登出',
+            'exit'    : 'exit                    登出并退出程序\n' + 
+                        '   Warning：直接关闭可能会导致不可预料的结果'
+        }
+
         command = arg.split(' ')[0]
         if command == 'all':
-            print('[Help] login nickname - 登录到聊天室，nickname是你选择的昵称')
-            print('[Help] send message - 发送消息，message是你输入的消息')
-            print('[Help] server host (port) - 切换到服务器，host是服务器的IP地址或主机名，port是端口')
-            print('[Help] logout - 退出聊天室')
-
-        elif command == 'login':
-            print('[Help] login nickname - 登录到聊天室，nickname是你选择的昵称')
-        elif command == 'send':
-            print('[Help] send message - 发送消息，message是你输入的消息')
-
-        elif command == 'server':
-            print('[Help] server host (port) - 切换到服务器，host是服务器的IP地址或主机名，port是端口')
-            print('[Help] server search (port) - 在局域网上寻找服务器，port是端口')
-        elif command == 'logout':
-            print('[Help] logout - 退出聊天室')
+            for i in help_str:
+                print ( i )
+        elif command in help_str.keys:
+            print ( '[Help] ' + help_str [ command ] )
         else:
             os.system('help ' + arg)
 
