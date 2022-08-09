@@ -464,7 +464,7 @@ class Client(Cmd):
         if command == 'all':
             for i in help_str:
                 print ( i )
-        elif command in help_str.keys:
+        elif command in help_str.keys():
             print ( '[Help] ' + help_str [ command ] )
         else:
             os.system('help ' + arg)
