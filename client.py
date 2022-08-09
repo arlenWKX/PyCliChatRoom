@@ -11,8 +11,7 @@ ids = []
 id_of = {}
 name_of = {}
 
-version='RC4'
-
+version='RC5'
 class DummyFile(object):
     def write(self, x): pass
     def flush(self): pass
@@ -84,25 +83,25 @@ class Client(Cmd):
             try:
                 buffer = self.__socket.recv(1024).decode()
                 obj = json.loads(buffer)
+                output = ''
                 if obj['type'] == 0:
-                    print('\n[' + str(obj['sender_nickname']) + '(' + str(obj['sender_id']
-                                                                          ) + ')' + '] ' + obj['message'] + '\n' + self.prompt, end='')
+                    output = '[' + str(obj['sender_nickname']) + '(' + str(obj['sender_id']) + ')' + '] ' + obj['message']
                 elif obj['type'] == 1:
                     user_name = obj['message'].split(' ')[0]
                     user_id = int(obj['message'].split(' ')[1])
                     ids.append(user_id)
                     id_of[user_name] = user_id
                     name_of[user_id] = user_name
-                    print('\n[System(0)] 用户' + user_name + '(' +
-                          str(user_id) + ') 加入了聊天室 ' + '\n' + self.prompt, end='')
+                    output = '[System(0)] 用户' + user_name + '(' + str(user_id) + ') 加入了聊天室'
                 elif obj['type'] == 2:
                     user_name = obj['message'].split(' ')[0]
                     user_id = int(obj['message'].split(' ')[1])
                     ids.remove(user_id)
                     id_of.pop(user_name)
                     name_of.pop(user_id)
-                    print('\n[System(0)] 用户' + user_name + '(' +
-                          str(user_id) + ') 退出了聊天室 ' + '\n' + self.prompt, end='')
+                    output = '[System(0)] 用户' + user_name + '(' + str(user_id) + ') 退出了聊天室'
+                
+                print ( '\n' + output + '\n' + self.prompt, end='' )
 
             except Exception as e:
                 print('[Client] 无法从服务器获取数据', e)
@@ -122,7 +121,7 @@ class Client(Cmd):
             }).encode())
         else:
             self.__socket.send(json.dumps({
-                'type': 'p2p',
+                'type': 'single',
                 'sender_id': self.__id,
                 'message': message,
                 'recv_id': recv_id
@@ -195,7 +194,7 @@ class Client(Cmd):
             tsocket.close()
             return False
 
-    def scan_func(self,ip,port,save_stdout,lst):
+    def scan_func(self,ip,port,lst):
         if self.testserver(ip, port):
             lst.append(ip)
         return
@@ -268,7 +267,7 @@ class Client(Cmd):
             self.__ip_addr = args[0]
             self.__port = 8888
             if len(args) > 1:
-                self.__port = args[1]
+                self.__port = int(args[1])
         print(f'[Client] 切换服务器到{self.__ip_addr}:{self.__port}')
         if not self.testserver(self.__ip_addr, self.__port):
             self.__ip_addr = self.__port = None
@@ -340,39 +339,43 @@ class Client(Cmd):
             target=self.__send_message_thread, args=(message,), daemon=True)
         thread.start()
 
+    def do_sendto(self, args):
+        """
+        单发消息
+        :param args: 参数
+        """
+        if self.__id == None:
+            print('[Client] 您还未登录')
+            return
 
-    # def do_sendto(self, args):
-    #     """
-    #     单发消息
-    #     :param args: 参数
-    #     """
-    #     if self.__id == None:
-    #         print('[Client] 您还未登录')
-    #         return
+        argss = args.split(' ')
 
-    #     recv_id = 0
-    #     recv_name = ''
+        if len(argss) < 2:
+            print ( '[Client] 请输入发送对象和消息' )
+            return
 
-    #     if args.split(' ')[0] == 'id':
-    #         recv_id = int(args.split(' ')[1])
-    #         print('recvid', recv_id )
-    #         if recv_id not in ids:
-    #             print('[Client] 未找到用户')
-    #             return
-    #         recv_name = name_of [ recv_id ]
-    #     elif args.split(' ')[0] == 'name':
-    #         if not args.split(' ')[1] in id_of:
-    #             print('[Client] 未找到用户')
-    #             return
-    #         recv_id = id_of[args.split(' ')[2]]
-    #         recv_name = args.split(' ')[1]
+        recvs=argss[0].split(',')
+        message=args[len(argss[0])+1:]
 
-    #     # 显示自己发送的消息
-    #     print('[' + str(self.__nickname) + '(' + str(self.__id) + ')' + '] 对 ' + recv_name + '(' + str(recv_id) + ') 悄悄说' + message)
-    #     # 开启子线程用于发送数据
-    #     thread = threading.Thread(target=self.__send_message_thread, args=(message, recv_id),daemon=True)
-    #     thread.start()
+        for x in recvs:
+            if x.isdigit():
+                if int(x) in ids:
+                    thread = threading.Thread(
+                        target=self.__send_message_thread, args=(self.__nickname + '(' + str(self.__id) + ') 对你说' + message,int(x)), daemon=True)
+                    thread.start()
+                else:
+                    recvs.remove ( x )
+            else:
+                if x in id_of.keys ( ):
+                    thread = threading.Thread(
+                        target=self.__send_message_thread, args=(self.__nickname + '(' + str(self.__id) + ') 对你说' + message,id_of[x]), daemon=True)
+                    thread.start()
+                else:
+                    recvs.remove ( x )
 
+        # 显示自己发送的消息
+        print('[' + str(self.__nickname) + '(' + str(self.__id) + ')' + '] 对 ' + ",".join(map(str,recvs)) + ' 说' + message)
+        # 开启子线程用于发送数据
 
     def do_logout(self, args=None):
         """
@@ -417,7 +420,6 @@ class Client(Cmd):
         """
         command = arg.split(' ')[0]
         if command == 'all':
-            print('[Help] connect ipaddress (port) - 连接到服务器，ipaddress是服务器的IP地址，port是端口')
             print('[Help] login nickname - 登录到聊天室，nickname是你选择的昵称')
             print('[Help] send message - 发送消息，message是你输入的消息')
             print('[Help] server host (port) - 切换到服务器，host是服务器的IP地址或主机名，port是端口')
@@ -435,7 +437,6 @@ class Client(Cmd):
             print('[Help] logout - 退出聊天室')
         else:
             os.system('help ' + arg)
-
 
 client = Client()
 client.start()

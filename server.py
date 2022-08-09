@@ -3,7 +3,7 @@ import threading
 import json
 
 
-version='RC4'
+version='RC5'
 
 class Server:
     """
@@ -36,10 +36,12 @@ class Server:
                 # 解析成json数据
                 obj = json.loads(buffer)
                 if obj['type'] == 'broadcast':
-                    self.__broadcast(user_id=obj['sender_id'], type=0, message=obj['message'])
+                    self.__broadcast(user_id=obj['sender_id'], message=obj['message'])
+                elif obj['type'] == 'single':
+                    self.__single(user_id=obj['sender_id'], message=obj['message'], client_id=obj['recv_id'])
                 elif obj['type'] == 'logout':
                     print('[Server] 用户', user_id, nickname, '退出聊天室')
-                    self.__broadcast(user_id=0, message=str(nickname)+' '+str(user_id), type=2, except_id = user_id)
+                    self.__broadcast(user_id=0, message=str(nickname)+' '+str(user_id), except_id = user_id, type=2)
                     self.__connections[user_id] = None
                     break
                 elif obj['type'] == 'exit':
@@ -52,22 +54,23 @@ class Server:
                 print('[Server] 连接失效:', connection.getsockname(), connection.fileno(), e)
                 break
 
-    # def __send2p(self, client_id, user_id=0, message=''):
-    #     """
-    #     单发
-    #     :param client_id: 接受消息的客户端id
-    #     :param user_id: 用户id(0为系统)
-    #     :param message: 广播内容
-    #     """
-    #     for i in range(1, len(self.__connections)):
-    #         if client_id == i and self.__connections[i]:
-    #             self.__connections[i].send(json.dumps({
-    #                 'sender_id': user_id,
-    #                 'sender_nickname': self.__nicknames[user_id],
-    #                 'message': message
-    #             }).encode())
+    def __single(self, message, user_id, client_id, type=0):
+        """
+        单发
+        :param client_id: 接受消息的客户端id
+        :param user_id: 用户id(0为系统)
+        :param message: 广播内容
+        """
+        for i in range(0, len(self.__connections)):
+            if user_id != i and client_id == i and self.__connections[i]:
+                self.__connections[i].send(json.dumps({
+                    'sender_id': user_id,
+                    'sender_nickname': self.__nicknames[user_id],
+                    'message': message,
+                    'type': type
+                }).encode())
 
-    def __broadcast(self, user_id=0, type=0, message='', except_id = None):
+    def __broadcast(self, user_id, message, except_id = None, type=0):
         """
         广播
         :param user_id: 用户id(0为系统)
