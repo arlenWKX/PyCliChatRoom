@@ -3,7 +3,7 @@ import threading
 import json
 
 
-version='RC5'
+version='1.0.0'
 
 class Server:
     """

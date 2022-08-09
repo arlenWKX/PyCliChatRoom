@@ -11,7 +11,8 @@ ids = []
 id_of = {}
 name_of = {}
 
-version='RC5'
+version='1.0.0'
+
 class DummyFile(object):
     def write(self, x): pass
     def flush(self): pass
